@@ -1,0 +1,349 @@
+<!doctype html>
+<html>
+  <head>
+  <meta charset="utf-8">
+    <title>Topology</title>
+    <style>
+.direct {
+  stroke: #aaa;
+}
+.edge {
+  stroke: #aaa;
+}
+.HOST text {
+stroke:#333;
+cursos:pointer;
+}
+.SWITCH text {
+stroke:#333;
+cursos:pointer;
+}
+</style>
+   </head>
+<body>
+<p class="tt",style="font : 20px"></p>
+<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+ <script type="text/javascript">
+ $(document).ready(function(){
+       var socket = io.connect('http://localhost:3000');//you can replace localhost with your public domain name too!!
+       var width =1000, height=550;  
+       var svg =d3.select("body").append("svg")
+	  .attr("width",width)
+	  .attr("height",height);       
+
+       var force = d3.layout.force()
+	  .gravity(.05)
+	   .distance(100)
+	   .charge(-200)
+	   .size([width, height])
+	   var data2;
+	   
+	   socket.on('first',function(data){
+		   //console.log(data);
+		   draw(data,force,svg);
+		   data2=data;
+	   });
+
+       socket.on('notification', function (data) {
+        	  svg.selectAll("*").remove();
+        	  draw(data,force,svg);  
+        	  data2=data;
+           });
+       
+				
+       
+      }); 
+
+ function draw(data,force,svg){
+ var content=data;
+ var force=force;
+ var svg=svg;
+ var edges=[];
+ var SWITCH=[];
+ var im=["/image/switch-g.png","/image/switch-b.png","/image/switch-p.png","/image/switch-r.png"]
+ content.nodes.forEach(function(e){
+	 if(e.controller!=undefined){
+	var count=0;
+	for(var i=0; i<SWITCH.length;i++){
+		if(e.controller==SWITCH[i]){
+			break;
+		}
+		else{count++;}			
+	}
+	if(count==SWITCH.length){
+		SWITCH.push(e.controller);
+	}
+	 }
+ });
+ console.log(SWITCH);
+ content.links.forEach(function(e) { 
+	   var sourceNode = content.nodes.filter(function(n) { return n._id === e.Source_Node; })[0],
+	   targetNode = content.nodes.filter(function(n) { return n._id === e.Destination_Node; })[0];
+	   if(e.type=="edge"){
+	   edges.push({source: sourceNode, target: targetNode, type: e.type,sport:e.sport});
+	   }
+	   else{
+		   edges.push({source: sourceNode, target: targetNode, type: e.type,sport:e.sport,dport:e.dport});
+	   }
+	   });
+
+	force.nodes(content.nodes)
+  .links(edges)
+  .start();
+
+var test = svg.append("g");
+var test2 = svg.append("g")
+			.attr("class","cont");
+var test3 = svg.append("g")
+		.attr("class","contro");
+var infot=svg.append("g")
+			.attr("class","popup");
+			
+var res2=test.append("rect")
+			.attr("width",125)
+			.attr("height",120)
+			.attr("stroke","black")
+			.attr("fill","none");
+			
+for(var i=0;i<SWITCH.length; i++){
+	test2.append("image")
+		.attr("xlink:href",function(d){
+		return im[i];
+	})
+		.attr("x",130)
+		.attr("y",30*(i))
+		.attr("width",30)
+		.attr("height",30);
+	
+	d3.select(".contro").append("foreignObject")
+	.attr("class","contex")
+	.attr("x",160)
+	.attr("y",30*i)
+	.attr("width",170)
+	.attr("height",30)
+	.append("xhtml:body")
+	.style("font", "14px 'Helvetica Neue'")
+	.html("<p>"+SWITCH[i]);
+	
+	d3.select(".contro").append("rect")
+	.attr("class","conrec")
+	.attr("x",160)
+	.attr("y",30*i)
+	.attr("width",170)
+	.attr("height",30)
+	.attr("stroke","none")
+	.attr("fill","none");
+};	
+
+
+var hostc=content.hostcount;
+
+var tes=test.append("foreignObject")
+		.attr("width",125)
+		.attr("height",120)
+		.append("xhtml:body")
+		.style("font", "14px 'Helvetica Neue'")
+		.html("<p>Device 수 : "+content.devicecount+"</p><p>link 수 : "+content.linkcount+"</p><p> host 수 :"+hostc);
+
+ var link = svg.selectAll(".link")
+    .data(edges)
+  .enter().append("line")
+    .attr("class", function(d){
+    	if(d.type=="edge"){
+    		return "edge";
+    	}
+    	else {return "direct";}
+    })//여기 수정 .attr("class","link")
+  .style("stroke-width", 3);
+
+var node = svg.selectAll(".node")
+    .data(content.nodes)
+  .enter().append("g")
+    .attr("class", function(d){
+    	if(d.type=="SWITCH"){
+    			return "SWITCH";
+    	}
+    	else{
+    		return "HOST";
+    	}
+    })//여기 클래스 원본 .attr("class","node")
+    .call(force.drag);
+
+node.append("image")
+	.attr("xlink:href",function(d){
+		if(d.type=="SWITCH"){
+			for(var i=0; i<SWITCH.length;i++){
+				if(d.controller==SWITCH[i])
+					{
+					return im[i];
+					}
+			}
+		}
+		else {return "/image/host.png";}
+	})
+    .attr("x", -8)
+.attr("y", -8)
+.attr("width", 25)
+.attr("height", 25);
+
+node.append("text")
+    .attr("dx", 20)
+    .attr("dy", ".35em")
+    .text(function(d) { return d._id });
+
+force.on("tick", function() {
+	link.attr("x1", function(d) {return d.source.x;})
+		.attr("y1", function(d) {return d.source.y;})
+		.attr("x2", function(d) {return d.target.x;})
+		.attr("y2", function(d) {return d.target.y;});
+		
+  node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+});
+ 
+var info = false;
+node.on("click",function(d){
+	if(d3.event.defaultPrevented)return;
+
+	var popup=d3.select(".popup")
+	.append("foreignObject")
+	.attr("class","pinfo")
+	.attr("x",800)
+	.attr("y",400)
+	.attr("width",170)
+	.attr("height",130);
+	
+	var rect3=d3.select(".popup").append("rect")
+	.attr("class","prect")
+	.attr("x",800)
+	.attr("y",400)
+	.attr("width",170)
+	.attr("height",130)
+	.attr("stroke","black")
+	.attr("fill","none");	
+	if(info){
+		d3.selectAll(".pinfo").remove();
+		d3.selectAll(".prect").remove();
+	}
+	else{
+		if(linkinfo){
+			d3.selectAll(".linfo").remove();
+			d3.selectAll(".lrect").remove();
+			linkinfo=!linkinfo;
+		}		
+	if(d.type=="SWITCH")
+		{
+		popup.append("xhtml:body")
+		.style("font", "14px 'Helvetica Neue'")
+		.html("<p>Type : Device</p><p>Name : "+d._id+"</p><p>HW : "+d.hw);
+		}
+	else{
+		popup.append("xhtml:body")
+		.style("font", "14px 'Helvetica Neue'")
+		.html("<p> </p><p>Type : Host</p><p>Name : "+d._id);
+		}
+	}
+	info=!info
+ });
+
+ var linkinfo=false;
+ link.on("click",function(d){
+	 console.log(d.source);
+		var popup=d3.select(".popup")
+		.append("foreignObject")
+		.attr("class","linfo")
+		.attr("x",800)
+		.attr("y",330)
+		.attr("width",170)
+		.attr("height",200);
+	
+		var rect3=d3.select(".popup").append("rect")
+		.attr("class","lrect")
+		.attr("x",800)
+		.attr("y",330)
+		.attr("width",170)
+		.attr("height",200)
+		.attr("stroke","black")
+		.attr("fill","none");		
+		if(linkinfo){
+			d3.selectAll(".linfo").remove();
+			d3.selectAll(".lrect").remove();
+		}
+		else{
+			if(info)
+				{
+				d3.selectAll(".pinfo").remove();
+				d3.selectAll(".prect").remove();
+				info=!info;
+				}
+		if(d.type=="DIRECT")
+			{
+			popup.append("xhtml:body")
+			.style("font", "14px 'Helvetica Neue'")
+			.html("<p>Type : Direct</p><p>A : "+d.source._id+"</p><p>A port : "+d.sport+"</p><p>B : "+d.target._id+"</p><p>B port : "+d.dport);
+			}
+		else{
+			popup.append("xhtml:body")
+			.style("font", "14px 'Helvetica Neue'")
+			.html("<p> </p><p>Type : Edge</p><p>A : "+d.source._id+"</p><p>A port : "+d.sport+"</p><p>B : "+d.target._id);
+		}
+		}
+		linkinfo=!linkinfo
+ });
+ var hos=svg.append("g")
+	.attr("class","cl")
+	.append("image")
+	.attr("xlink:href","/image/host.png")
+	.attr("width",25)
+	.attr("height",25)
+	.attr("x",0)
+	.attr("y",130);
+ 
+test.append("foreignObject")
+	.attr("class","visiblet")
+	.attr("x",30)
+	.attr("y",130)
+	.attr("width",170)
+	.attr("height",30)
+	.append("xhtml:body")
+	.style("font", "14px 'Helvetica Neue'")
+	.html("<p>Visible");
+	
+	d3.select(".contro").append("rect")
+	.attr("class","visible")
+	.attr("x",30)
+	.attr("y",10)
+	.attr("width",170)
+	.attr("height",30)
+	.attr("stroke","none")
+	.attr("fill","none");
+ 
+ 
+ var hostinfo=true;				
+ hos.on("click",function(d){
+	  if(hostinfo){
+		  d3.selectAll(".edge").remove();
+		  d3.selectAll(".HOST").remove();
+		  d3.selectAll(".visiblet").remove();
+		  test.append("foreignObject")
+			.attr("class","visiblet")
+			.attr("x",30)
+			.attr("y",130)
+			.attr("width",170)
+			.attr("height",30)
+			.append("xhtml:body")
+			.style("font", "14px 'Helvetica Neue'")
+			.html("<p>Inviisible");
+		  hostinfo=!hostinfo;
+	  }
+	  else{
+		  svg.selectAll("*").remove();
+		  draw(data,force,svg);
+		  hostinfo=!hostinfo;
+	  }
+ }) 
+ }
+    </script>
+</body>
+</html>
